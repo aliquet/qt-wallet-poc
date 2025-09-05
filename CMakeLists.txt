@@ -4,28 +4,27 @@ project(qt_wallet_poc LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Zapne AUTOMOC/AUTORCC/AUTOUIC + nastaví moderní Qt CMake policy (vč. QTP0001)
 find_package(Qt6 6.5 COMPONENTS Quick Qml REQUIRED)
-qt_standard_project_setup()  # <- klíčové
+qt_standard_project_setup()  # zapne AUTOMOC/AUTOUIC/AUTORCC + Qt policy
 
+# 👇 DŮLEŽITÉ: přidej MACOSX_BUNDLE
 qt_add_executable(qt_wallet_poc
+    MACOSX_BUNDLE
     src/main.cpp
     src/WalletSimulator.cpp
     src/WalletSimulator.h
 )
 
-# Pro jistotu ještě přímo na targetu (někdy CI tvrdohlavé)
 set_target_properties(qt_wallet_poc PROPERTIES
     AUTOMOC ON
     AUTORCC ON
     AUTOUIC ON
+    MACOSX_BUNDLE_GUI_IDENTIFIER com.example.walletpoc
 )
 
-# QML modul zabalený do stejného targetu
 qt_add_qml_module(qt_wallet_poc
     URI WalletPoc
     VERSION 1.0
-    # volitelně: sjednotíme prefix, ať je to stejné všude
     RESOURCE_PREFIX /
     QML_FILES
         qml/Main.qml
