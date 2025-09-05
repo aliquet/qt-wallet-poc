@@ -27,7 +27,7 @@ jobs:
           path: build/qt_wallet_poc
           if-no-files-found: error
 
-    build-macos:
+  build-macos:
     name: macOS (Qt 6.5)
     runs-on: macos-latest
     steps:
@@ -42,7 +42,6 @@ jobs:
         run: cmake -S . -B build
       - name: Build
         run: cmake --build build --parallel
-      # volitelné: zabalit Qt knihovny do .app (aby šla spustit mimo runner)
       - name: Deploy app
         run: |
           if [ -d "build/qt_wallet_poc.app" ]; then
@@ -62,7 +61,6 @@ jobs:
           name: macos-app
           path: build/qt_wallet_poc-macos.zip
           if-no-files-found: error
-
 
   build-windows:
     name: Windows (Qt 6.5)
