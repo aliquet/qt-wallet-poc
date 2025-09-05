@@ -1,17 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 project(qt_wallet_poc LANGUAGES CXX)
 
-# Qt: zapni automoc/autouic/autorcc (řeší metatype generation error)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
 
+# Zapne AUTOMOC/AUTORCC/AUTOUIC + nastaví moderní Qt CMake policy (vč. QTP0001)
 find_package(Qt6 6.5 COMPONENTS Quick Qml REQUIRED)
-
-# Qt policy: nastav prefix pro QML moduly (umlčí warning QTP0001)
-qt_policy(SET QTP0001 NEW)
+qt_standard_project_setup()  # <- klíčové
 
 qt_add_executable(qt_wallet_poc
     src/main.cpp
@@ -19,10 +14,18 @@ qt_add_executable(qt_wallet_poc
     src/WalletSimulator.h
 )
 
-# QML modul uvnitř stejného targetu
+# Pro jistotu ještě přímo na targetu (někdy CI tvrdohlavé)
+set_target_properties(qt_wallet_poc PROPERTIES
+    AUTOMOC ON
+    AUTORCC ON
+    AUTOUIC ON
+)
+
+# QML modul zabalený do stejného targetu
 qt_add_qml_module(qt_wallet_poc
     URI WalletPoc
     VERSION 1.0
+    # volitelně: sjednotíme prefix, ať je to stejné všude
     RESOURCE_PREFIX /
     QML_FILES
         qml/Main.qml
