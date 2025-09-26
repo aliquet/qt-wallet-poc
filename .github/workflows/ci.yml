@@ -1,4 +1,12 @@
-  build-linux:
+name: CI (Qt Wallet PoC)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+    build-linux:
     name: Linux (Qt 6.5) – AppImage via linuxdeployqt
     runs-on: ubuntu-latest
     steps:
@@ -65,4 +73,85 @@
         with:
           name: linux-appimage
           path: qt-wallet-poc-linux-x86_64.AppImage
+          if-no-files-found: error
+
+  build-macos:
+    name: macOS (Qt 6.5) – .app bundle
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.3'
+          host: 'mac'
+          target: 'desktop'
+
+      - name: Configure
+        run: cmake -S . -B build
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Deploy app (macdeployqt)
+        run: |
+          if [ -d "build/qt_wallet_poc.app" ]; then
+            macdeployqt build/qt_wallet_poc.app -qmldir=./qml -verbose=1 || true
+          fi
+
+      - name: Zip .app bundle
+        run: |
+          test -d build/qt_wallet_poc.app
+          cd build
+          ditto -c -k --sequesterRsrc --keepParent qt_wallet_poc.app qt_wallet_poc-macos.zip
+          ls -la qt_wallet_poc-macos.zip
+
+      - name: Upload artifact (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: build/qt_wallet_poc-macos.zip
+          if-no-files-found: error
+
+  build-windows:
+    name: Windows (Qt 6.5) – bundled DLLs
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.3'
+          host: 'windows'
+          target: 'desktop'
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Deploy Qt (windeployqt)
+        shell: pwsh
+        run: |
+          $qtbin = "${Env:Qt6_DIR}\bin"
+          & "$qtbin\windeployqt.exe" `
+            --verbose 1 `
+            --qmldir qml `
+            --compiler-runtime `
+            build\Release\qt_wallet_poc.exe
+
+      - name: Zip Windows bundle
+        shell: pwsh
+        run: |
+          cd build\Release
+          tar -a -c -f qt_wallet_poc-windows.zip *
+
+      - name: Upload artifact (Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: build/Release/qt_wallet_poc-windows.zip
           if-no-files-found: error
