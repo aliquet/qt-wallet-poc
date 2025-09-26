@@ -6,24 +6,16 @@ on:
   workflow_dispatch:
 
 jobs:
-    build-linux:
-    name: Linux (Qt 6.5) – AppImage via linuxdeployqt
+  build-linux:
+    name: Linux (Qt 6.5) – raw binary
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: '6.5.3'
-          host: 'linux'
-          target: 'desktop'
-          modules: 'qtbase qtdeclarative qtquickcontrols2'
-
-      - name: Install build deps
+      - name: Install Qt (apt)
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++
+          sudo apt-get install -y cmake g++ qt6-base-dev qt6-declarative-dev
 
       - name: Configure
         run: cmake -S . -B build
@@ -31,48 +23,11 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
-      - name: Prepare AppDir structure
-        run: |
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-
-          cp build/qt_wallet_poc AppDir/usr/bin/qt_wallet_poc
-
-          cat > AppDir/usr/share/applications/qt-wallet-poc.desktop <<'EOF'
-          [Desktop Entry]
-          Name=Qt Wallet PoC
-          Exec=qt_wallet_poc
-          Icon=qt-wallet-poc
-          Type=Application
-          Categories=Utility;
-          EOF
-
-          # 1×1 px placeholder ikona (můžeš nahradit svou)
-          base64 -d > AppDir/usr/share/icons/hicolor/256x256/apps/qt-wallet-poc.png << 'EOF'
-          iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=
-          EOF
-
-      - name: Download linuxdeployqt
-        run: |
-          wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continous-x86_64.AppImage -O linuxdeployqt.AppImage || \
-          wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-x86_64.AppImage -O linuxdeployqt.AppImage
-          chmod +x linuxdeployqt.AppImage
-
-      - name: Create AppImage
-        env:
-          QML_SOURCES_PATHS: ./qml
-        run: |
-          ./linuxdeployqt.AppImage AppDir/usr/share/applications/qt-wallet-poc.desktop -qmldir=./qml -bundle-non-qt-libs -appimage
-          APP=$(ls *.AppImage | head -n1)
-          mv "$APP" qt-wallet-poc-linux-x86_64.AppImage
-          ls -la qt-wallet-poc-linux-x86_64.AppImage
-
-      - name: Upload artifact (AppImage)
+      - name: Upload artifact (Linux binary)
         uses: actions/upload-artifact@v4
         with:
-          name: linux-appimage
-          path: qt-wallet-poc-linux-x86_64.AppImage
+          name: linux-binary
+          path: build/qt_wallet_poc
           if-no-files-found: error
 
   build-macos:
@@ -87,6 +42,7 @@ jobs:
           version: '6.5.3'
           host: 'mac'
           target: 'desktop'
+          modules: 'qtbase qtdeclarative qtquickcontrols2'
 
       - name: Configure
         run: cmake -S . -B build
@@ -98,11 +54,12 @@ jobs:
         run: |
           if [ -d "build/qt_wallet_poc.app" ]; then
             macdeployqt build/qt_wallet_poc.app -qmldir=./qml -verbose=1 || true
+          else
+            echo "App bundle not found:"; ls -la build; exit 1
           fi
 
       - name: Zip .app bundle
         run: |
-          test -d build/qt_wallet_poc.app
           cd build
           ditto -c -k --sequesterRsrc --keepParent qt_wallet_poc.app qt_wallet_poc-macos.zip
           ls -la qt_wallet_poc-macos.zip
@@ -126,6 +83,7 @@ jobs:
           version: '6.5.3'
           host: 'windows'
           target: 'desktop'
+          modules: 'qtbase qtdeclarative qtquickcontrols2'
 
       - name: Configure
         run: cmake -S . -B build -A x64
@@ -137,10 +95,14 @@ jobs:
         shell: pwsh
         run: |
           $qtbin = "${Env:Qt6_DIR}\bin"
+          if (-not (Test-Path "build\Release\qt_wallet_poc.exe")) {
+            Get-ChildItem -Recurse build
+            throw "Executable not found at build\Release\qt_wallet_poc.exe"
+          }
           & "$qtbin\windeployqt.exe" `
-            --verbose 1 `
             --qmldir qml `
             --compiler-runtime `
+            --verbose 1 `
             build\Release\qt_wallet_poc.exe
 
       - name: Zip Windows bundle
