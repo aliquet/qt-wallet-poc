@@ -7,23 +7,15 @@ on:
 
 jobs:
   build-linux:
-    name: Linux (Qt 6.5) – AppImage
+    name: Linux (Qt 6.5) – raw binary
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: '6.5.3'
-          host: 'linux'
-          target: 'desktop'
-
-      - name: Install build deps
+      - name: Install Qt from apt
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ patchelf
-          # linuxdeploy nepotřebuje system Qt, ale patchelf ano
+          sudo apt-get install -y cmake g++ qt6-base-dev qt6-declarative-dev
 
       - name: Configure
         run: cmake -S . -B build
@@ -31,53 +23,11 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
-      - name: Prepare AppImage metadata
-        run: |
-          # minimal .desktop soubor
-          cat > qt-wallet-poc.desktop <<'EOF'
-          [Desktop Entry]
-          Name=Qt Wallet PoC
-          Exec=qt_wallet_poc
-          Icon=qt-wallet-poc
-          Type=Application
-          Categories=Utility;
-          EOF
-
-          # malá ikona (1x1 px) – placeholder (base64 -> png)
-          base64 -d > qt-wallet-poc.png << 'EOF'
-          iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMA
-          ASsJTYQAAAAASUVORK5CYII=
-          EOF
-
-      - name: Download linuxdeploy + qt plugin
-        run: |
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-          chmod +x linuxdeploy-*.AppImage
-
-      - name: Create AppImage
-        env:
-          # Umožní pluginu najít QML soubory a zabalit QML pluginy
-          QML_SOURCES_PATHS: ./qml
-        run: |
-          # AppDir sestaví z binárky + desktop + ikony, qt plugin přibalí Qt knihovny
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir \
-            -e build/qt_wallet_poc \
-            -d qt-wallet-poc.desktop \
-            -i qt-wallet-poc.png \
-            --plugin qt
-          # vyrobí AppImage v aktuálním adresáři
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
-          ls -la *.AppImage
-          # přejmenujeme hezky:
-          APPIMG=$(ls *.AppImage | head -n1)
-          mv "$APPIMG" qt-wallet-poc-linux-x86_64.AppImage
-
-      - name: Upload artifact (AppImage)
+      - name: Upload artifact (binary)
         uses: actions/upload-artifact@v4
         with:
-          name: linux-appimage
-          path: qt-wallet-poc-linux-x86_64.AppImage
+          name: linux-binary
+          path: build/qt_wallet_poc
           if-no-files-found: error
 
   build-macos:
